@@ -1,0 +1,32 @@
+{
+  "id": "aniwave-se",
+  "name": "AniWave.se",
+  "version": "2.2",
+  "language": "typescript",
+  "type": "provider",
+  "author": "Grok",
+  "payload": {
+    "baseURL": "https://www.aniwave.se",
+    "ajaxURL": "https://www.aniwave.se/ajax",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+      "Referer": "https://www.aniwave.se/",
+      "Origin": "https://www.aniwave.se",
+      "DNT": "1",
+      "Accept": "application/json, text/plain, */*",
+      "X-Requested-With": "XMLHttpRequest",
+      "Sec-Fetch-Mode": "cors"
+    },
+
+    "getSettings": {
+      "episodeServers": ["Vidstreaming", "MyCloud", "StreamTape", "Filemoon"],
+      "supportsDub": true
+    },
+
+    "search": "async (query) => {\n  const q = encodeURIComponent(query.query.trim().replace(/\\s+/g, '+'));\n  const url = `${this.baseURL}/filter?keyword=${q}`;\n  try {\n    const res = await fetch(url, { headers: this.headers });\n    if (!res.ok) return [];\n    const text = await res.text();\n    const $ = LoadDoc(text);\n    const results = [];\n    $('div.film_list-wrap div.flw-item').each((_, el) => {\n      const a = $(el).find('a').first();\n      const href = a.attr('href');\n      const title = a.attr('title') || a.find('h3').text().trim();\n      const img = $(el).find('img').attr('data-src') || $(el).find('img').attr('src');\n      const dub = $(el).find('.tick-dub').length > 0;\n      if (href && title) {\n        const id = href.split('/').pop().split('?')[0];\n        results.push({\n          id,\n          title,\n          image: img?.startsWith('http') ? img : `${this.baseURL}${img}`,\n          url: `${this.baseURL}/watch/${id}`,\n          subOrDub: dub ? 'dub' : 'sub'\n        });\n      }\n    });\n    return results;\n  } catch (e) {\n    console.error('[AniWave.se] Search error:', e);\n    return [];\n  }\n}",
+
+    "findEpisodes": "async (id) => {\n  const url = `${this.baseURL}/watch/${id}`;\n  try {\n    const res = await fetch(url, { headers: this.headers });\n    if (!res.ok) throw new Error('Page failed');\n    const text = await res.text();\n    const animeIdMatch = text.match(/data-id=[\"'](\\d+)[\"']/i);\n    const animeId = animeIdMatch ? animeIdMatch[1] : null;\n    if (!animeId) throw new Error('Anime ID not found');\n\n    const epRes = await fetch(`${this.ajaxURL}/v2/episode/list/${animeId}?_=${Date.now()}`, { headers: this.headers });\n    const epJson = await epRes.json();\n    if (!epJson.html) throw new Error('No episodes');\n\n    const $$ = LoadDoc(epJson.html);\n    const episodes = [];\n    $$('a[data-ids]').each((_, el) => {\n      const epNum = $$(el).attr('data-num');\n      const epId = $$(el).attr('data-ids');\n      const title = $$(el).find('.ep-title').text().trim() || `Episode ${epNum}`;\n      if (epId && epNum) {\n        episodes.push({\n          id: epId,\n          number: parseInt(epNum, 10),\n          title\n        });\n      }\n    });\n    return episodes.sort((a, b) => a.number - b.number);\n  } catch (e) {\n    console.error('[AniWave.se] Episodes error:', e);\n    return [];\n  }\n}",
+
+    "findEpisodeServer": "async (episode, serverName) => {\n  const server = serverName === 'default' ? 'Vidstreaming' : serverName;\n  const epId = episode.id;\n  try {\n    const servRes = await fetch(`${this.ajaxURL}/v2/server/list/${epId}?_=${Date.now()}`, { headers: this.headers });\n    const servJson = await servRes.json();\n    if (!servJson.html) throw new Error('No servers');\n    const $ = LoadDoc(servJson.html);\n    let serverId = null;\n    $(`div[data-type][title=\"${server}\"]`).each((_, el) => {\n      const id = $(el).attr('data-id');\n      if (id) serverId = id;\n    });\n    if (!serverId) throw new Error(`Server ${server} not found`);\n\n    const linkRes = await fetch(`${this.ajaxURL}/v2/server/${serverId}?_=${Date.now()}`, { headers: this.headers });\n    const linkJson = await linkRes.json();\n    if (!linkJson.link) throw new Error('No link');\n    const link = linkJson.link;\n\n    const playerHeaders = { ...this.headers, Referer: link };\n    if (link.includes('.m3u8')) {\n      return { server, videoSources: [{ quality: 'auto', url: link, type: 'm3u8', subtitles: [] }], headers: playerHeaders };\n    }\n\n    const playerRes = await fetch(link, { headers: playerHeaders });\n    const playerText = await playerRes.text();\n    const m3u8 = playerText.match(/https?:\\\\/\\\\/[^\\\\s\\\\\"'']+\\\\.m3u8[^\\\\\"\\\\s]*/i);\n    if (m3u8) {\n      return { server, videoSources: [{ quality: 'auto', url: m3u8[0], type: 'm3u8', subtitles: [] }], headers: playerHeaders };\n    }\n    throw new Error('No m3u8 found');\n  } catch (e) {\n    console.error(`[AniWave.se] ${server} error:`, e);\n    throw new Error('Stream failed: ' + e.message);\n  }\n}"
+  }
+}

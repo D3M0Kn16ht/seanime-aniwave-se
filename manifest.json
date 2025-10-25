@@ -1,0 +1,10 @@
+{
+  "name": "AniWave.se",
+  "id": "aniwave-se",
+  "description": "AniWave.se provider with sub/dub support",
+  "version": "2.2",
+  "author": "Твоё_Имя_или_Grok",
+  "type": "provider",
+  "file": "aniwave-se.json",
+  "icon": "https://www.aniwave.se/favicon.ico"
+}
