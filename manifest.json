@@ -1,10 +1,9 @@
 {
   "name": "AniWave.se",
   "id": "aniwave-se",
-  "description": "AniWave.se provider with sub/dub support",
+  "description": "High-quality anime streaming with sub/dub support",
   "version": "2.2",
-  "author": "Твоё_Имя_или_Grok",
+  "author": "Grok",
   "type": "provider",
-  "file": "aniwave-se.json",
-  "icon": "https://www.aniwave.se/favicon.ico"
+  "file": "aniwave-se.json"
 }
